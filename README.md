@@ -13,11 +13,11 @@ To view plurk on Apple Watch.
 
 ## Implemented
 
-[v] 河道 (public, only mine)
-[v] Response count
-[v] See response
-[v] My profile 
-[] Response post
+- [v] 河道 (public, only mine)
+- [v] Response count
+- [v] See response
+- [v] My profile 
+- [] Response post
 
 ## Demo
 
