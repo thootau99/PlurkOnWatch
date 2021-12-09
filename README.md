@@ -11,12 +11,20 @@ To view plurk on Apple Watch.
 2. Login from iPhone & keep APP on Apple Watch running
 3. It should work now.
 
+## Implemented
+
+[v] 河道 (public, only mine)
+[v] Response count
+[v] See response
+[v] My profile 
+[] Response post
+
 ## Demo
 
 ![watch](https://images.plurk.com/3kNdbyT0jelnRWAMGj4tQK.png)
 
 ## Issue
 
-- Can't display image now
-- Can't display link
+- Can't display image, emoji now
+- Can't display link ~~¯\_(ツ)_/¯ Watch doesn't support link anyway~~
 
