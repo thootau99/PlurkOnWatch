@@ -17,7 +17,7 @@ To view plurk on Apple Watch.
 - [x] Response count
 - [x] See response
 - [x] My profile 
-- [] Response post
+- [ ] Response post
 
 ## Demo
 
