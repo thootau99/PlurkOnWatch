@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ResponseView : View {
-    @EnvironmentObject var plurk: PlurkConnector
+    @EnvironmentObject var plurk: PlurkConnectorWatch
     var post : Response
     var body: some View {
         Button(action: {}) {
@@ -22,7 +22,7 @@ struct ResponseView : View {
 }
 
 struct PlurkDetailView: View {
-    @EnvironmentObject var plurk: PlurkConnector
+    @EnvironmentObject var plurk: PlurkConnectorWatch
     
     
     var plurk_id: Int

@@ -8,9 +8,8 @@
 import SwiftUI
 import SwiftSoup
 
-
 struct PlurkPostView : View {
-    @EnvironmentObject var plurk: PlurkConnector
+    @EnvironmentObject var plurk: PlurkConnectorWatch
     var post : PlurkPost
     var body: some View {
         NavigationLink(destination: {
@@ -27,7 +26,7 @@ struct PlurkPostView : View {
 
 struct MainView: View {
     @EnvironmentObject var connector : PhoneConnector
-    @EnvironmentObject var plurk: PlurkConnector
+    @EnvironmentObject var plurk: PlurkConnectorWatch
     
     private func tokenInsert() {
         if (plurk._OAuthSwift.client.credential.oauthToken.isEmpty || plurk._OAuthSwift.client.credential.oauthTokenSecret.isEmpty) {
@@ -66,6 +65,9 @@ struct MainView: View {
                         .environmentObject(self.plurk)
                         .padding()
                 }
+            }
+            .onTapGesture {
+                print("i be tapped!!!")
             }
         }
         .navigationTitle("My Plurks")

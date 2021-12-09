@@ -10,7 +10,7 @@ import SwiftUI
 struct ContentView: View {
     
     @ObservedObject var connector = WatchConnector()
-    @EnvironmentObject var plurk: PlurkConnector_Phone
+    @EnvironmentObject var plurk: PlurkConnector
     var body: some View {
         VStack {
             HStack {
@@ -21,7 +21,6 @@ struct ContentView: View {
                             var tokens : Array<Message> = []
                             let token: Message = Message(key: "oauthToken", value: "\(self.plurk._OAuthSwift.client.credential.oauthToken),\(self.plurk._OAuthSwift.client.credential.oauthTokenSecret)")
                             tokens.append(token)
-                            print(tokens)
                             self.connector.send(messages: tokens)
                         }
                     }

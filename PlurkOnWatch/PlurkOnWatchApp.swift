@@ -9,7 +9,7 @@ import SwiftUI
 import OAuthSwift
 @main
 struct PlurkOnWatchApp: App {
-    @ObservedObject var plurk = PlurkConnector_Phone()
+    @ObservedObject var plurk = PlurkConnector()
     
     var body: some Scene {
         WindowGroup {

@@ -9,7 +9,7 @@ import SwiftUI
 
 @main
 struct PlurkOnWatchApp: App {
-    @StateObject var plurk : PlurkConnector = PlurkConnector()
+    @StateObject var plurk : PlurkConnectorWatch = PlurkConnectorWatch()
     @StateObject var connector : PhoneConnector = PhoneConnector()
     @SceneBuilder var body: some Scene {
         WindowGroup {

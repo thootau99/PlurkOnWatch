@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct MyProfileView: View {
-    @EnvironmentObject var plurk: PlurkConnector
+    @EnvironmentObject var plurk: PlurkConnectorWatch
     
     var body: some View {
         HStack {
