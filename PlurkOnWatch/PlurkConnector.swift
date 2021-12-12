@@ -3,6 +3,7 @@ import OAuthSwift
 import SwiftSoup
 import KeychainAccess
 import DotEnv
+import PromiseKit
 
 struct Profile: Codable, Hashable {
     var avatar_medium : String?
@@ -23,6 +24,7 @@ struct PlurkPost : Codable, Hashable {
     var content : String?
     var display_name: String?
     var response_count: Int?
+    var posted: String?
     var plurk_id : Int?
 }
 
@@ -32,7 +34,7 @@ struct PlurkUser : Codable, Hashable {
 }
 
 
-struct GetPlurkResponse : Codable {
+struct GetPlurkResponse : Codable, Hashable {
     var plurks: [PlurkPost]
     var plurk_users: [String: PlurkUser]
 }
@@ -52,12 +54,12 @@ struct GetResponse: Codable {
 
 class PlurkConnector : ObservableObject {
     @Published var loginSuccess = false
-    @Published var plurks : GetPlurkResponse = GetPlurkResponse(plurks: [], plurk_users: [:])
-    @Published var plurk_response : GetResponse = GetResponse(responses: [], friends: [:])
-
-    @Published var me : ProfileResponse = ProfileResponse(fans_count: 0, friends_count: 0, user_info: Profile())
+    @Published var lastPlurkTime: String = ""
+    let dateFormatter = DateFormatter()
     let _OAuthSwift : OAuth1Swift
     init() {
+        self.dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        self.dateFormatter.dateFormat = "E, d MMM yyyy HH:mm:ss zzz"
         do {
             var fileURL: String = ""
             if let url = Bundle.main.url(forResource: ".env", withExtension: "") {
@@ -172,129 +174,111 @@ class PlurkConnector : ObservableObject {
             }
         }
     }
-    func getMyProfile() {
-        let _ = _OAuthSwift.client.get("https://www.plurk.com/APP/Profile/getOwnProfile") {(result) in
-            switch result {
-                case .success(let response):
-                    let decoder = JSONDecoder()
-                    do {
-                        let data = response.string?.data(using: .utf8)
-                        let meResult = try decoder.decode(ProfileResponse.self, from: data!)
-                        self.me = meResult
-                    } catch {
-                        print("ERROR IN JSON PARSING")
-                    }
-                case .failure(let error):
-                    print(error.localizedDescription)
-            }
-        }
-    }
-    
-    func getPlurks() {
-        let calendar = Calendar(identifier: .gregorian)
-        let startOfDay = calendar.startOfDay(for: Date()).ISO8601Format()
-        let _ = _OAuthSwift.client.get("https://www.plurk.com/APP/Timeline/getPlurks", parameters: [:]) {(result) in
-            switch result {
-                case .success(let response):
-                    let decoder = JSONDecoder()
-                    do {
-                        let data = response.string?.data(using: .utf8)
-                        var plurkResult = try decoder.decode(GetPlurkResponse.self, from: data!)
-                        var plurkExecuted: [PlurkPost] = []
-                        
-                        
-                        for var plurk in plurkResult.plurks {
-                            // なまえをだいにゅうする
-                            plurk.display_name = plurkResult.plurk_users["\(plurk.owner_id)"]?.display_name
-                        
-                            do {
-                                let contentParsed = try SwiftSoup.parse(plurk.content ?? "")
-                                plurk.content = try contentParsed.text()
-                            }
-                            plurkExecuted.append(plurk)
+    func getMyProfile() -> Promise<ProfileResponse> {
+        return Promise<ProfileResponse> { seal in
+            var me : ProfileResponse = ProfileResponse(fans_count: 0, friends_count: 0, user_info: Profile())
+            let _ = _OAuthSwift.client.get("https://www.plurk.com/APP/Profile/getOwnProfile") {(result) in
+                switch result {
+                    case .success(let response):
+                        let decoder = JSONDecoder()
+                        do {
+                            let data = response.string?.data(using: .utf8)
+                            let meResult = try decoder.decode(ProfileResponse.self, from: data!)
+                            seal.fulfill(meResult)
+                        } catch {
+                            print("ERROR IN JSON PARSING")
                         }
-                        plurkResult.plurks = plurkExecuted
-                        self.plurks = plurkResult
-                    } catch {
-                        print("ERROR IN JSON PARSING")
-                    }
-                case .failure(let error):
-                    print(error.localizedDescription)
+                    case .failure(let error):
+                        print(error.localizedDescription)
+                }
             }
         }
     }
     
-    func getMyPlurks() {
-        let calendar = Calendar(identifier: .gregorian)
-        let startOfDay = calendar.startOfDay(for: Date()).ISO8601Format()
-        let _ = _OAuthSwift.client.get("https://www.plurk.com/APP/Timeline/getPlurks", parameters: ["filter": "my"]) {(result) in
-            switch result {
-                case .success(let response):
-                    let decoder = JSONDecoder()
-                    do {
-                        let data = response.string?.data(using: .utf8)
-                        var plurkResult = try decoder.decode(GetPlurkResponse.self, from: data!)
-                        var plurkExecuted: [PlurkPost] = []
-                        
-                        
-                        for var plurk in plurkResult.plurks {
-                            // なまえをだいにゅうする
-                            plurk.display_name = plurkResult.plurk_users["\(plurk.owner_id)"]?.display_name
+    func getPlurks(me: Bool) -> Promise<GetPlurkResponse> {
+        return Promise<GetPlurkResponse> { seal in
+            let onlymine = me ? ["filter": "my"] : [:]
+            var plurks: GetPlurkResponse = GetPlurkResponse(plurks: [], plurk_users: [:])
+            self._OAuthSwift.client.get("https://www.plurk.com/APP/Timeline/getPlurks", parameters: onlymine) {(result) in
+                    switch result {
+                        case .success(let response):
+                            let decoder = JSONDecoder()
+                            do {
+                                let data = response.string?.data(using: .utf8)
+                                var plurkResult = try decoder.decode(GetPlurkResponse.self, from: data!)
+                                var plurkExecuted: [PlurkPost] = []
+                                for var (index, plurk) in plurkResult.plurks.enumerated() {
+                                    // なまえをだいにゅうする
+                                    plurk.display_name = plurkResult.plurk_users["\(plurk.owner_id)"]?.display_name
+                                    
+                                    do {
+                                        let contentParsed = try SwiftSoup.parse(plurk.content ?? "")
+                                        plurk.content = try contentParsed.text()
+                                    }
+                                    plurkExecuted.append(plurk)
+                                    if index == plurkResult.plurks.count - 1 {
+                                        if let time = plurk.posted {
+                                            let date = self.dateFormatter.date(from: time)
+                                            if let ISO8601Date = date?.ISO8601Format() {
+                                                print(ISO8601Date)
+                                                self.lastPlurkTime = ISO8601Date
+                                            }
+                                        }
+                                    }
+                                }
+                                plurkResult.plurks = plurkExecuted
+                                seal.fulfill(plurkResult)
+                                print("got!")
+                            } catch {
+                                print("ERROR IN JSON PARSING")
+                            }
+                        case .failure(let error):
+                            print(error.localizedDescription)
+                    }
+                }
+            }
+    }
+    
+    func getPlurkResponses(plurk_id: Int) -> Promise<GetResponse> {
+        return Promise<GetResponse> {seal in
+            var plurkResponse : GetResponse = GetResponse(responses: [], friends: [:])
+
+            self._OAuthSwift.client.get("https://www.plurk.com/APP/Responses/getById", parameters: ["plurk_id": String(plurk_id)]) {(result) in
+                switch result {
+                    case .success(let response):
+                        let decoder = JSONDecoder()
+                        do {
+                            let data = response.string?.data(using: .utf8)
+                            var plurkResult = try decoder.decode(GetResponse.self, from: data!)
+                            var plurkExecuted: [Response] = []
                             
-                            do {
-                                let contentParsed = try SwiftSoup.parse(plurk.content ?? "")
-                                plurk.content = try contentParsed.text()
-                            }
-                            plurkExecuted.append(plurk)
-                        }
-                        plurkResult.plurks = plurkExecuted
-                        self.plurks = plurkResult
-                    } catch {
-                        print("ERROR IN JSON PARSING")
-                    }
-                case .failure(let error):
-                    print(error.localizedDescription)
-            }
-        }
-    }
-    
-    func getPlurkResponses(plurk_id: Int) {
-        let calendar = Calendar(identifier: .gregorian)
-        let startOfDay = calendar.startOfDay(for: Date()).ISO8601Format()
-        let _ = _OAuthSwift.client.get("https://www.plurk.com/APP/Responses/getById", parameters: ["plurk_id": String(plurk_id)]) {(result) in
-            switch result {
-                case .success(let response):
-                    let decoder = JSONDecoder()
-                    do {
-                        let data = response.string?.data(using: .utf8)
-                        var plurkResult = try decoder.decode(GetResponse.self, from: data!)
-                        var plurkExecuted: [Response] = []
-                        
-                        
-                        for var plurk in plurkResult.responses {
-                            // なまえをだいにゅうする
-                            plurk.display_name = plurkResult.friends["\(plurk.user_id)"]?.display_name
                             
-                            do {
-                                let contentParsed = try SwiftSoup.parse(plurk.content ?? "")
-                                plurk.content = try contentParsed.text()
+                            for var plurk in plurkResult.responses {
+                                // なまえをだいにゅうする
+                                plurk.display_name = plurkResult.friends["\(plurk.user_id)"]?.display_name
+                                
+                                do {
+                                    let contentParsed = try SwiftSoup.parse(plurk.content ?? "")
+                                    plurk.content = try contentParsed.text()
+                                }
+                                plurkExecuted.append(plurk)
                             }
-                            plurkExecuted.append(plurk)
+                            plurkResult.responses = plurkExecuted
+                            seal.fulfill(plurkResult)
+                        } catch {
+                            print("ERROR IN JSON PARSING")
                         }
-                        plurkResult.responses = plurkExecuted
-                        self.plurk_response = plurkResult
-                    } catch {
-                        print("ERROR IN JSON PARSING")
-                    }
-                case .failure(let error):
-                    print(error.localizedDescription)
+                    case .failure(let error):
+                        print(error.localizedDescription)
+                }
             }
         }
+
     }
     
     func postPlurk(plurk_id : Int?, content: String, qualifier: String) {
         guard let checkPlurkId : Int = plurk_id else {
-            let _ = _OAuthSwift.client.post("https://www.plurk.com/APP/Timeline/plurkAdd", parameters: ["content": content, "qualifier": qualifier]) {result in
+            let _ = self._OAuthSwift.client.post("https://www.plurk.com/APP/Timeline/plurkAdd", parameters: ["content": content, "qualifier": qualifier]) {result in
                 switch result {
                     case .success(let response):
                         print(response.string as Any)
@@ -304,7 +288,8 @@ class PlurkConnector : ObservableObject {
             }
             return
         }
-        let _ = _OAuthSwift.client.post("https://www.plurk.com/APP/Responses/responseAdd", parameters: ["plurk_id": checkPlurkId, "content": content, "qualifier": qualifier]) {result in
+        let _ = self._OAuthSwift.client.post("https://www.plurk.com/APP/Responses/responseAdd", parameters: ["plurk_id": checkPlurkId, "content": content, "qualifier": qualifier]) {result in
+            
             switch result {
                 case .success(let response):
                     print(response.string as Any)

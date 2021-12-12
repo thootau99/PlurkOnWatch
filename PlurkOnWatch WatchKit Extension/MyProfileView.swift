@@ -9,19 +9,23 @@ import SwiftUI
 
 struct MyProfileView: View {
     @EnvironmentObject var plurk: PlurkConnectorWatch
-    
+    @State var me : ProfileResponse = ProfileResponse(fans_count: 0, friends_count: 0, user_info: Profile())
     var body: some View {
         HStack {
             VStack {
-                Text(self.plurk.me.user_info.display_name ?? "")
+                Text(self.me.user_info.display_name ?? "")
                     .font(.title2)
-                Text(self.plurk.me.user_info.nick_name ?? "")
+                Text(self.me.user_info.nick_name ?? "")
                     .font(.title3)
-                Text(self.plurk.me.user_info.about ?? "")
+                Text(self.me.user_info.about ?? "")
                     .font(.body)
             }
         }
-        .onAppear(perform: { plurk.getMyProfile() })
+        .onAppear {
+            plurk.getMyProfile().done { profile in
+                self.me = profile
+            }
+        }
     }
 }
 

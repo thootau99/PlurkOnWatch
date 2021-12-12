@@ -23,13 +23,13 @@ struct ResponseView : View {
 
 struct PlurkDetailView: View {
     @EnvironmentObject var plurk: PlurkConnectorWatch
-    
+    @State var plurkResponse: GetResponse = GetResponse(responses: [], friends: [:])
     
     var plurk_id: Int
     var body: some View {
         ScrollView {
             VStack {
-                ForEach(self.plurk.plurk_response.responses, id: \.self) { _plurk in
+                ForEach(plurkResponse.responses, id: \.self) { _plurk in
                     ResponseView(post: _plurk)
                         .environmentObject(self.plurk)
                         .padding()
@@ -37,10 +37,14 @@ struct PlurkDetailView: View {
             }
         }
             .onAppear(perform: {() in
-                getPlurks()
+                Task.init {
+                    await self.getPlurks()
+                }
             })
     }
-    private func getPlurks() {
-        self.plurk.getPlurkResponses(plurk_id: self.plurk_id)
+    private func getPlurks() async {
+        self.plurk.getPlurkResponses(plurk_id: self.plurk_id).done { responses in
+            plurkResponse = responses
+        }
     }
 }

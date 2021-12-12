@@ -27,14 +27,18 @@ struct PlurkPostView : View {
 struct MainView: View {
     @EnvironmentObject var connector : PhoneConnector
     @EnvironmentObject var plurk: PlurkConnectorWatch
-    
-    private func tokenInsert() {
+    @State var plurks: GetPlurkResponse = GetPlurkResponse(plurks: [], plurk_users: [:])
+
+    private func tokenInsert() async {
         if (plurk._OAuthSwift.client.credential.oauthToken.isEmpty || plurk._OAuthSwift.client.credential.oauthTokenSecret.isEmpty) {
             plurk.login(token: connector.oauthToken, tokenSecret: connector.oauthTokenSecret)
             //plurk.login(token: "yk0faWMkZiGV", tokenSecret: "WB8HU9oZ6oYAJwz49mXXMpGpPJKkOxcn")
         }
+        print("insetring token")
         
-        plurk.getPlurks()
+        plurk.getPlurks(me: false).done {_plurks in
+            self.plurks = _plurks
+        }
     }
     
     var body: some View {
@@ -50,17 +54,21 @@ struct MainView: View {
                         }
                     }
                     Button("Only my plurk") {
-                        plurk.getMyPlurks()
+                        plurk.getPlurks(me: true).done {_plurks in
+                            self.plurks = _plurks
+                        }
                     }
                     Button("All plurk") {
-                        plurk.getPlurks()
+                        plurk.getPlurks(me: false).done {_plurks in
+                            self.plurks = _plurks
+                        }
                     }
                     Button("Logout") {
                         plurk.logout()
                         connector.cleanOauthToken()
                     }
                 }
-                ForEach(self.plurk.plurks.plurks, id: \.self) { _plurk in
+                ForEach(self.plurks.plurks, id: \.self) { _plurk in
                     PlurkPostView(post: _plurk)
                         .environmentObject(self.plurk)
                         .padding()
@@ -71,7 +79,11 @@ struct MainView: View {
             }
         }
         .navigationTitle("My Plurks")
-        .onAppear(perform: { self.tokenInsert() })
+        .onAppear {
+            Task.init {
+                await self.tokenInsert()
+            }
+        }
     }
 }
 
