@@ -18,7 +18,11 @@ struct ProfileResponse: Codable, Hashable {
     var user_info: Profile
 }
 
-struct PlurkPost : Codable, Hashable {
+struct PlurkPost : Codable, Hashable, Identifiable {
+    
+    let id: UUID = UUID()
+    var photos: [String] = []
+    
     var owner_id : Int
     var user_id : Int?
     var content : String?
@@ -26,6 +30,8 @@ struct PlurkPost : Codable, Hashable {
     var response_count: Int?
     var posted: String?
     var plurk_id : Int?
+    
+    private enum CodingKeys : String, CodingKey { case owner_id, user_id, content, display_name, response_count, posted, plurk_id }
 }
 
 struct PlurkUser : Codable, Hashable {
@@ -35,6 +41,7 @@ struct PlurkUser : Codable, Hashable {
 
 
 struct GetPlurkResponse : Codable, Hashable {
+    
     var plurks: [PlurkPost]
     var plurk_users: [String: PlurkUser]
 }
@@ -55,6 +62,7 @@ struct GetResponse: Codable {
 class PlurkConnector : ObservableObject {
     @Published var loginSuccess = false
     @Published var lastPlurkTime: String = ""
+    @Published var plurks: GetPlurkResponse = GetPlurkResponse(plurks: [], plurk_users: [:])
     let dateFormatter = DateFormatter()
     let _OAuthSwift : OAuth1Swift
     init() {
@@ -197,9 +205,12 @@ class PlurkConnector : ObservableObject {
     
     func getPlurks(me: Bool) -> Promise<GetPlurkResponse> {
         return Promise<GetPlurkResponse> { seal in
-            let onlymine = me ? ["filter": "my"] : [:]
-            var plurks: GetPlurkResponse = GetPlurkResponse(plurks: [], plurk_users: [:])
-            self._OAuthSwift.client.get("https://www.plurk.com/APP/Timeline/getPlurks", parameters: onlymine) {(result) in
+            var parameters = OAuthSwift.Parameters()
+            if me {
+                parameters["filter"] = "me"
+            }
+            parameters["offset"] = lastPlurkTime.isEmpty ? "" : lastPlurkTime
+            self._OAuthSwift.client.get("https://www.plurk.com/APP/Timeline/getPlurks", parameters: parameters) {(result) in
                     switch result {
                         case .success(let response):
                             let decoder = JSONDecoder()
@@ -214,20 +225,24 @@ class PlurkConnector : ObservableObject {
                                     do {
                                         let contentParsed = try SwiftSoup.parse(plurk.content ?? "")
                                         plurk.content = try contentParsed.text()
+                                        for imageLink: Element in try contentParsed.select("img").array() {
+                                            let imageSrc: String = try imageLink.attr("src")
+                                            plurk.photos.append(imageSrc)
+                                        }
                                     }
                                     plurkExecuted.append(plurk)
                                     if index == plurkResult.plurks.count - 1 {
                                         if let time = plurk.posted {
                                             let date = self.dateFormatter.date(from: time)
                                             if let ISO8601Date = date?.ISO8601Format() {
-                                                print(ISO8601Date)
                                                 self.lastPlurkTime = ISO8601Date
                                             }
                                         }
                                     }
                                 }
                                 plurkResult.plurks = plurkExecuted
-                                seal.fulfill(plurkResult)
+                                self.plurks.plurks += plurkExecuted
+                                seal.fulfill(self.plurks)
                                 print("got!")
                             } catch {
                                 print("ERROR IN JSON PARSING")

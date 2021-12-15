@@ -11,30 +11,56 @@ import SwiftSoup
 struct PlurkPostView : View {
     @EnvironmentObject var plurk: PlurkConnectorWatch
     var post : PlurkPost
+    let columns = Array(repeating: GridItem(), count: 2)
     var body: some View {
         NavigationLink(destination: {
             PlurkDetailView(plurk_id: post.plurk_id ?? 0).environmentObject(plurk) }) {
             VStack {
                 Text(post.display_name ?? "")
                 Text(post.content ?? "")
+                LazyVGrid(columns: columns) {
+                    ForEach(post.photos, id: \.self) { photo in
+                        AsyncImage(url: URL(string: photo)) {phase in
+                            switch phase {
+                            case .empty:
+                                Color.purple.opacity(0.1)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            case .failure(_):
+                                Image(systemName: "exclamationmark.icloud")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .aspectRatio(0.90, contentMode: .fill)
+                            @unknown default:
+                                Image(systemName: "exclamationmark.icloud")
+                            }
+                        }
+                            .onTapGesture {
+                                print("tap on image \(photo.replacingOccurrences(of: "mx_", with: ""))")
+                            }
+                            .frame(width: 36)
+                    }
+                }
+                .padding()
             }
-            
+            .frame(alignment: .top)
         }
-        .overlay(Text(String(post.response_count!)).offset(x: 0, y: -10), alignment: Alignment.topTrailing)
     }
+    
 }
 
 struct MainView: View {
     @EnvironmentObject var connector : PhoneConnector
     @EnvironmentObject var plurk: PlurkConnectorWatch
     @State var plurks: GetPlurkResponse = GetPlurkResponse(plurks: [], plurk_users: [:])
+    @State var onlyme: Bool = false
 
     private func tokenInsert() async {
         if (plurk._OAuthSwift.client.credential.oauthToken.isEmpty || plurk._OAuthSwift.client.credential.oauthTokenSecret.isEmpty) {
             plurk.login(token: connector.oauthToken, tokenSecret: connector.oauthTokenSecret)
-            //plurk.login(token: "yk0faWMkZiGV", tokenSecret: "WB8HU9oZ6oYAJwz49mXXMpGpPJKkOxcn")
         }
-        print("insetring token")
         
         plurk.getPlurks(me: false).done {_plurks in
             self.plurks = _plurks
@@ -42,48 +68,65 @@ struct MainView: View {
     }
     
     var body: some View {
-        ScrollView {
+        List {
+            NavigationLink {
+                MyProfileView()
+                    .environmentObject(plurk)
+            } label: {
+                HStack {
+                    Text("me")
+                }
+            }
+            Button("Only my plurk") {
+                onlyme = true
+                plurk.getPlurks(me: onlyme).done {_plurks in
+                    self.plurks = _plurks
+                }
+            }
+            Button("All plurk") {
+                onlyme = false
+                plurk.getPlurks(me: onlyme).done {_plurks in
+                    self.plurks = _plurks
+                }
+            }
+            Button("Logout") {
+                plurk.logout()
+                connector.cleanOauthToken()
+            }
+            ForEach(self.plurks.plurks, id: \.self) { _plurk in
+                PlurkPostView(post: _plurk)
+                    .environmentObject(self.plurk)
+                    .padding()
+                    .overlay(Text(String(_plurk.response_count!)).offset(x: 0, y: -10), alignment: Alignment.topTrailing)
+            }
+            
+            
             VStack {
-                VStack {
-                    NavigationLink {
-                        MyProfileView()
-                            .environmentObject(plurk)
-                    } label: {
-                        HStack {
-                            Text("me")
-                        }
-                    }
-                    Button("Only my plurk") {
-                        plurk.getPlurks(me: true).done {_plurks in
-                            self.plurks = _plurks
-                        }
-                    }
-                    Button("All plurk") {
-                        plurk.getPlurks(me: false).done {_plurks in
-                            self.plurks = _plurks
-                        }
-                    }
-                    Button("Logout") {
-                        plurk.logout()
-                        connector.cleanOauthToken()
+                Button("Get more plurk") {
+                    plurk.getPlurks(me: onlyme).done {_plurks in
+                        self.plurks = _plurks
                     }
                 }
-                ForEach(self.plurks.plurks, id: \.self) { _plurk in
-                    PlurkPostView(post: _plurk)
-                        .environmentObject(self.plurk)
-                        .padding()
-                }
-            }
-            .onTapGesture {
-                print("i be tapped!!!")
-            }
+            }.onAppear(perform: { plurk.getPlurks(me: onlyme).done {_plurks in
+                self.plurks = _plurks
+            } })
         }
         .navigationTitle("My Plurks")
+        
         .onAppear {
             Task.init {
                 await self.tokenInsert()
             }
         }
+        .onPreferenceChange(ViewOffsetKey.self) { print("offset >> \($0)") }
+    }
+}
+
+struct ViewOffsetKey: PreferenceKey {
+    typealias Value = CGFloat
+    static var defaultValue = CGFloat.zero
+    static func reduce(value: inout Value, nextValue: () -> Value) {
+        value += nextValue()
     }
 }
 
