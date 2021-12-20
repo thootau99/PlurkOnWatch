@@ -12,6 +12,7 @@ struct PlurkPostView : View {
     @EnvironmentObject var plurk: PlurkConnectorWatch
     var post : PlurkPost
     let columns = Array(repeating: GridItem(), count: 2)
+    @State private var imageURL: String?
     var body: some View {
         NavigationLink(destination: {
             PlurkDetailView(plurk_id: post.plurk_id ?? 0).environmentObject(plurk) }) {
@@ -28,6 +29,7 @@ struct PlurkPostView : View {
                                 image
                                     .resizable()
                                     .scaledToFill()
+                                
                             case .failure(_):
                                 Image(systemName: "exclamationmark.icloud")
                                     .resizable()
@@ -37,9 +39,6 @@ struct PlurkPostView : View {
                                 Image(systemName: "exclamationmark.icloud")
                             }
                         }
-                            .onTapGesture {
-                                print("tap on image \(photo.replacingOccurrences(of: "mx_", with: ""))")
-                            }
                             .frame(width: 36)
                     }
                 }
@@ -79,12 +78,14 @@ struct MainView: View {
             }
             Button("Only my plurk") {
                 onlyme = true
+                self.plurks = GetPlurkResponse(plurks: [], plurk_users: [:])
                 plurk.getPlurks(me: onlyme).done {_plurks in
                     self.plurks = _plurks
                 }
             }
             Button("All plurk") {
                 onlyme = false
+                self.plurks = GetPlurkResponse(plurks: [], plurk_users: [:])
                 plurk.getPlurks(me: onlyme).done {_plurks in
                     self.plurks = _plurks
                 }
