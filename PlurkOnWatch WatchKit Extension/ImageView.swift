@@ -8,9 +8,9 @@
 import SwiftUI
 
 struct ImageView: View {
-    var imageURL: URL
+    var imageURL: String?
     var body: some View {
-        AsyncImage(url: imageURL) {phase in
+        AsyncImage(url: URL(string: imageURL ?? "")) {phase in
             switch phase {
             case .empty:
                 Color.purple.opacity(0.1)
@@ -33,6 +33,6 @@ struct ImageView: View {
 
 struct ImageView_Previews: PreviewProvider {
     static var previews: some View {
-        ImageView(imageURL: URL(string: "https://i.imgflip.com/3pnet2.png")!)
+        ImageView(imageURL: "https://i.imgflip.com/3pnet2.png")
     }
 }

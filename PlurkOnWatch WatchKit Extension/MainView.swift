@@ -12,10 +12,10 @@ struct PlurkPostView : View {
     @EnvironmentObject var plurk: PlurkConnectorWatch
     var post : PlurkPost
     let columns = Array(repeating: GridItem(), count: 2)
+    @State private var imageTag: String?
     @State private var imageURL: String?
     var body: some View {
-        NavigationLink(destination: {
-            PlurkDetailView(plurk_id: post.plurk_id ?? 0).environmentObject(plurk) }) {
+        ZStack {
             VStack {
                 Text(post.display_name ?? "")
                 Text(post.content ?? "")
@@ -29,6 +29,11 @@ struct PlurkPostView : View {
                                 image
                                     .resizable()
                                     .scaledToFill()
+                                    .onTapGesture {
+                                        self.imageURL = photo.replacingOccurrences(of: "mx_", with: "")
+                                        self.imageTag = "\(post.plurk_id)_photo"
+                                        print("touching \(self.imageURL)")
+                                    }
                                 
                             case .failure(_):
                                 Image(systemName: "exclamationmark.icloud")
@@ -41,11 +46,26 @@ struct PlurkPostView : View {
                         }
                             .frame(width: 36)
                     }
+                    
+                    
+                
                 }
+                .buttonStyle(.plain)
                 .padding()
             }
-            .frame(alignment: .top)
+            NavigationLink(destination: {
+                PlurkDetailView(plurk_id: post.plurk_id ?? 0).environmentObject(plurk) }) {
+                    EmptyView()
+                }.opacity(0)
+            NavigationLink(tag: "\(post.plurk_id)_photo", selection: $imageTag) {
+                ImageView(imageURL: imageURL)
+                                   } label: {
+                                       EmptyView()
+                                   }
+                                   .hidden()
+            
         }
+
     }
     
 }
