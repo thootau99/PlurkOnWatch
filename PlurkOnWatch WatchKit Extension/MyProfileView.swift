@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct MyProfileView: View {
-    @EnvironmentObject var plurk: PlurkConnector
+    @EnvironmentObject var plurk: PlurkConnectorWatch
     @State var me : ProfileResponse = ProfileResponse(fans_count: 0, friends_count: 0, user_info: Profile())
     var body: some View {
         HStack {
@@ -22,7 +22,7 @@ struct MyProfileView: View {
             }
         }
         .onAppear {
-            plurk.getMyProfile().done { profile in
+            plurk.getProfile(me: true, user_id: "").done { profile in
                 self.me = profile
             }
         }

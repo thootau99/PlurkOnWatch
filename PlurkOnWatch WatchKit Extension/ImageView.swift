@@ -8,8 +8,10 @@
 import SwiftUI
 
 struct ImageView: View {
-    var imageURL: String?
+    @State var imageURL: String?
+    @State var showImageViewer = true
     var body: some View {
+        
         AsyncImage(url: URL(string: imageURL ?? "")) {phase in
             switch phase {
             case .empty:
