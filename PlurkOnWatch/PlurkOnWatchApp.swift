@@ -13,7 +13,7 @@ struct PlurkOnWatchApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainViewPhone()
                 .environmentObject(plurk)
                 .onOpenURL(perform: {url in
                     OAuthSwift.handle(url: url)

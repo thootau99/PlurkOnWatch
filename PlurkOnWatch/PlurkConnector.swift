@@ -22,6 +22,7 @@ struct PlurkPost : Codable, Hashable, Identifiable {
     
     let id: UUID = UUID()
     var photos: [String] = []
+    var avatar_url: String?
     
     var owner_id : Int
     var user_id : Int?
@@ -37,6 +38,8 @@ struct PlurkPost : Codable, Hashable, Identifiable {
 struct PlurkUser : Codable, Hashable {
     var id : Int?
     var display_name: String?
+    var has_profile_image: Int?
+    var avatar: Int?
 }
 
 
@@ -128,7 +131,7 @@ class PlurkConnector : ObservableObject {
         }
     }
     
-    func login(completion: @escaping () -> ()) throws {
+    func login(completion: @escaping () -> ()) {
         let keychain = Keychain(service: "org.thootau.plurkwatch")
         guard let token = try? keychain.get("oauthToken"),
               let tokenSecret = try? keychain.get("oauthTokenSecret") else {
@@ -182,10 +185,10 @@ class PlurkConnector : ObservableObject {
             }
         }
     }
-    func getMyProfile() -> Promise<ProfileResponse> {
+    func getProfile(me: Bool, user_id: String) -> Promise<ProfileResponse> {
         return Promise<ProfileResponse> { seal in
-            var me : ProfileResponse = ProfileResponse(fans_count: 0, friends_count: 0, user_info: Profile())
-            let _ = _OAuthSwift.client.get("https://www.plurk.com/APP/Profile/getOwnProfile") {(result) in
+            let requestURL = me ? "https://www.plurk.com/APP/Profile/getOwnProfile": "https://www.plurk.com/APP/Profile/getPublicProfile?user_id=\(user_id)"
+            let _ = _OAuthSwift.client.get(requestURL) {(result) in
                 switch result {
                     case .success(let response):
                         let decoder = JSONDecoder()
@@ -207,7 +210,7 @@ class PlurkConnector : ObservableObject {
         return Promise<GetPlurkResponse> { seal in
             var parameters = OAuthSwift.Parameters()
             if me {
-                parameters["filter"] = "me"
+                parameters["filter"] = "my"
             }
             parameters["offset"] = lastPlurkTime.isEmpty ? "" : lastPlurkTime
             self._OAuthSwift.client.get("https://www.plurk.com/APP/Timeline/getPlurks", parameters: parameters) {(result) in
@@ -221,6 +224,20 @@ class PlurkConnector : ObservableObject {
                                 for var (index, plurk) in plurkResult.plurks.enumerated() {
                                     // なまえをだいにゅうする
                                     plurk.display_name = plurkResult.plurk_users["\(plurk.owner_id)"]?.display_name
+                                    if (plurkResult.plurk_users["\(plurk.owner_id)"]?.has_profile_image == 1 && plurkResult.plurk_users["\(plurk.owner_id)"]?.avatar == nil) {
+                                        if let user_id = plurk.user_id {
+                                            plurk.avatar_url = " https://avatars.plurk.com/\(user_id)-small.gif"
+                                        }
+                                        
+                                    } else if (plurkResult.plurk_users["\(plurk.owner_id)"]?.has_profile_image == 1 && plurkResult.plurk_users["\(plurk.owner_id)"]?.avatar != nil) {
+                                        if let user_id = plurk.user_id, let avatar = plurkResult.plurk_users["\(plurk.owner_id)"]?.avatar  {
+                                            plurk.avatar_url = " https://avatars.plurk.com/\(user_id)-small\(avatar).gif"
+                                            }
+                                        
+                                    } else {
+                                        plurk.avatar_url = "  https://www.plurk.com/static/default_small.jpg"
+                                    }
+                                    
                                     
                                     do {
                                         let contentParsed = try SwiftSoup.parse(plurk.content ?? "")
@@ -244,8 +261,19 @@ class PlurkConnector : ObservableObject {
                                 self.plurks.plurks += plurkExecuted
                                 seal.fulfill(self.plurks)
                                 print("got!")
+                            } catch let DecodingError.dataCorrupted(context) {
+                                print(context)
+                            } catch let DecodingError.keyNotFound(key, context) {
+                                print("Key '\(key)' not found:", context.debugDescription)
+                                print("codingPath:", context.codingPath)
+                            } catch let DecodingError.valueNotFound(value, context) {
+                                print("Value '\(value)' not found:", context.debugDescription)
+                                print("codingPath:", context.codingPath)
+                            } catch let DecodingError.typeMismatch(type, context)  {
+                                print("Type '\(type)' mismatch:", context.debugDescription)
+                                print("codingPath:", context.codingPath)
                             } catch {
-                                print("ERROR IN JSON PARSING")
+                                print("error: ", error)
                             }
                         case .failure(let error):
                             print(error.localizedDescription)

@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ContentView: View {
+struct NotLoginView: View {
     
     @ObservedObject var connector = WatchConnector()
     @EnvironmentObject var plurk: PlurkConnector
@@ -33,7 +33,7 @@ struct ContentView: View {
     }
 }
 
-struct ContentView_Previews: PreviewProvider {
+struct NotLoginView_Preview: PreviewProvider {
     static var previews: some View {
         ContentView()
     }
